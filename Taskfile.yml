@@ -1,0 +1,84 @@
+version: '3'
+
+env:
+  # set the tag before compilation or making the Docker image.
+  TAG: 1.0
+
+  # set the docker registry where the image should be pushed to.
+  DOCKER_REGISTRY: localhost:5000
+
+  # set the host's port that should be mapped to the container, in a development environment.
+  PUBLISH_PORT: 9999
+
+tasks:
+
+  # builds the GOYAV executable
+  build:
+    env:
+      CGO_ENABLED: 0
+    cmds:
+      - go build -C src/cmd -o {{.USER_WORKING_DIR}}/"goyav-$TAG" .
+  
+  # builds the docker image in local docker registry
+  mk_image:
+    env:
+      IMAGE: "goyav:{{.TAG}}"
+    cmds:
+      - task: rm_image
+      - docker build -f {{.USER_WORKING_DIR}}/resources/docker/Dockerfile -t $IMAGE {{.USER_WORKING_DIR}}/src
+      - docker tag $IMAGE $DOCKER_REGISTRY/$IMAGE
+  
+  # removes the docker image from local docker registry
+  rm_image:
+    env:
+      IMAGE: "goyav:{{.TAG}}"
+    cmds:
+      - docker image inspect $IMAGE > /dev/null 2>&1 && docker image rm $IMAGE || echo "Image $IMAGE not found, skipping removal."
+      - docker image inspect $DOCKER_REGISTRY/$IMAGE > /dev/null 2>&1 && docker image rm $DOCKER_REGISTRY/$IMAGE || echo "Image $DOCKER_REGISTRY/$IMAGE not found, skipping removal."
+
+
+  # ~~~ DEV TASKS ~~~
+  # ~ These tasks are intended for a development environment ~
+
+  # starts up GOYAV in a development environment.
+  dev_goyav_up:
+    env: 
+      GOYAV_TAG: "{{.TAG}}"
+      DEV_ENV_NETWORK: environment_goyav_network
+    dir: "{{.USER_WORKING_DIR}}/resources/docker/"
+    cmds:
+      - task: dev_goyav_down
+      - docker compose --file compose.yml --env-file .env.dev config
+      - docker compose --file compose.yml --env-file .env.dev create
+      - docker network connect $DEV_ENV_NETWORK goyav
+      - docker compose --file compose.yml --env-file .env.dev start
+      - sleep 1s
+      - docker compose --file compose.yml logs goyav
+  
+   # stops GOYAV in a development environment.
+  dev_goyav_down:
+    env:  
+      GOYAV_TAG: "{{.TAG}}"
+    dir: "{{.USER_WORKING_DIR}}/resources/docker/"
+    cmds:
+      - docker compose --file compose.yml --env-file .env.dev down --remove-orphans
+
+  # sets up the development environment.
+  dev_environment_up:
+    dir: "{{.USER_WORKING_DIR}}/resources/test/environment/"
+    cmds:
+      - docker compose --file compose.yml --env-file .env.dev up -d
+      - sleep 10s
+  
+  # shuts down the development environment and removes volumes.
+  dev_environment_down:
+    dir: "{{.USER_WORKING_DIR}}/resources/test/environment/"
+    cmds:
+      - docker compose --file compose.yml --env-file .env.dev  down --remove-orphans --volumes
+  
+  # tests the EICAR file upload.
+  dev_test_eicar:
+    env:
+      PORT: "{{.PUBLISH_PORT}}"
+    cmds:
+      - bash {{.USER_WORKING_DIR}}/resources/test/test_upload_eicar.sh

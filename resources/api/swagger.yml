@@ -1,0 +1,176 @@
+openapi: 3.0.0
+info:
+  title: GoyAV
+  version: "1.0"
+  description: Service for uploading documents and performing virus scanning to ensure security and integrity of files.
+tags:
+  - name: Documents
+    description: Endpoints for uploading documents and retrieving their antivirus analysis results.
+  - name: Health
+    description: Endpoints for checking the operational status of the service.
+
+paths:
+  /documents:
+    post:
+      summary: Upload a document for antivirus analysis
+      tags:
+        - Documents
+      description: Allows users to upload documents for virus scanning. Documents can be tagged for categorization.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The document file to be uploaded and scanned.
+                tag:
+                  type: string
+                  description: An optional tag to categorize the document.
+      responses:
+        '201':
+          description: Document is successfully uploaded and is queued for analysis.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IDMessage'
+        '400':
+          description: Invalid request, such as missing file or unsupported format.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfoMessage'
+        '413':
+          description: The uploaded file is too large. Please check the maximum file size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfoMessage'
+
+  /documents/{id}:
+    get:
+      summary: Retrieve the analysis status of a document
+      tags:
+        - Documents
+      description: Fetches the current status of the document's antivirus analysis using its unique identifier.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: Unique identifier of the document whose status is being requested.
+      responses:
+        '200':
+          description: Successfully retrieved the document's status including analysis results if available.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocMessage'
+        '400':
+          description: The provided ID was invalid. Ensure the ID is correct.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IDMessage'
+        '404':
+          description: Document with the provided ID was not found. Ensure the ID is correct.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IDMessage'
+
+  /ping:
+    get:
+      summary: Service Health Check
+      tags:
+        - Health
+      description: Provides a simple way to check if the service is operational.
+      responses:
+        '200':
+          description: Service is operational and responding to requests.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PingMessage'
+
+components:
+  schemas:
+    ID:
+      type: string
+      example: RNiGEv6oqPNt6C4SeKuwLw
+    
+    Document:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/ID'
+        hash:
+          type: string
+          example: 275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f
+          description: Document hash
+        hash_algo:
+          type: string
+          example: SHA-256
+          description: Hash algorithm used
+        tag:
+          type: string
+          example: "my_tag"
+          description: Tag associated with the document
+        analyse_status:
+          type: string
+          enum: [infected, clean, pending]
+          description: Document analysis status
+        analyzed_at:
+          type: string
+          format: date-time
+          description: Date and time of document analysis
+        created_at:
+          type: string
+          format: date-time
+          description: Date and time of document creation
+    
+    DocMessage:
+      type: object
+      properties:
+        document:
+          $ref: '#/components/schemas/Document'
+        message:
+          type: string
+          description: Message associated with the operation
+          
+    IDMessage:
+      type: object
+      properties:
+        id:
+          $ref: '#/components/schemas/ID'
+        message:
+          type: string
+          description: Message associated with the operation
+    
+    PingMessage:
+      type: object
+      properties:
+        version:
+          type: string
+          example: "1.0"
+          description: Current version of GoyAV
+        information:
+          type: string
+          example: "Information about the service, including the URL for the API specification."
+          description: Information about the service
+        message:
+          type: string
+          example: "PONG: everything is good"
+          description: Message associated with the operation
+          
+    InfoMessage:
+      type: object
+      properties:
+        message:
+          type: string
+          description: Informational message associated with the operation
+

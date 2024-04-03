@@ -1,0 +1,42 @@
+services:
+  goyav:
+    image: ${DOCKER_REGISTRY}/goyav:${GOYAV_TAG}
+    container_name: goyav
+    environment:
+      - GOYAV_DEBUG_MODE=${GOYAV_DEBUG_MODE:-false}
+      - GOYAV_HOST=${GOYAV_HOST:-0.0.0.0}
+      - GOYAV_PORT=${GOYAV_PORT:-80}
+      - GOYAV_MAX_UPLOAD_SIZE=${GOYAV_MAX_UPLOAD_SIZE:-1}
+      - GOYAV_UPLOAD_TIMEOUT=${GOYAV_UPLOAD_TIMEOUT:-10}
+
+      # use the image's tag, if the version is not defined. 
+      - GOYAV_VERSION=${GOYAV_VERSION:-${GOYAV_TAG}}
+      - GOYAV_INFORMATION
+      
+      - GOYAV_RESULT_TTL
+      - GOYAV_AUTO_PURGE
+      - GOYAV_SEMAPHORE_CAPACITY
+
+      - GOYAV_S3_HOST
+      - GOYAV_S3_PORT=${GOYAV_MINIO_PORT:-9000}
+      - GOYAV_S3_ACCESS_KEY
+      - GOYAV_S3_SECRET_KEY
+      - GOYAV_S3_BUCKET_NAME
+      - GOYAV_S3_USE_SSL=${GOYAV_MINIO_USE_SSL:-false}
+
+      - GOYAV_POSTGRES_HOST
+      - GOYAV_POSTGRES_PORT=${GOYAV_POSTGRES_PORT:-5432}
+      - GOYAV_POSTGRES_USER
+      - GOYAV_POSTGRES_USER_PASSWORD
+      - GOYAV_POSTGRES_DB
+      - GOYAV_POSTGRES_SCHEMA
+      - GOYAV_POSTGRES_SSL_MODE=${GOYAV_POSTGRES_SSL_MODE:-require}
+
+      - GOYAV_CLAMAV_HOST
+      - GOYAV_CLAMAV_PORT=${GOYAV_CLAMAV_PORT:-3310}
+      - GOYAV_CLAMAV_TIMEOUT
+    expose:
+      - ${GOYAV_PORT:-80}
+    ports:
+      - ${PUBLISH_PORT}:${GOYAV_PORT:-80}
+    restart: always

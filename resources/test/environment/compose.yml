@@ -1,0 +1,64 @@
+# This Docker Compose configuration file sets up a local simulation environment for testing purposes.
+# It simulates key components of the infrastructure required for testing our GoLang tool, including:
+# - A database instance to mimic production database interactions.
+# - An S3-compatible object storage service for testing file storage functionality.
+# - ClamAV antivirus service to validate file scanning and security features.
+
+services:
+  minio:
+    image: quay.io/minio/minio
+    restart: always
+    expose:
+      - 9000
+      - 9001
+    ports:
+      - 9000:9000
+      - 9001:9001
+    environment:
+      - MINIO_ROOT_USER
+      - MINIO_ROOT_PASSWORD
+    volumes:
+      - /tmp/minio:/data 
+    command: server /data --console-address ":9001"
+    networks:
+      - goyav_network
+
+  clamav:
+    image: clamav/clamav:1.2
+    restart: always
+    expose:
+      - 3310
+      - 7357
+    ports:
+      - 3310:3310
+      - 7357:7357
+    volumes:
+      - clamdb:/var/lib/clamav
+    networks:
+      - goyav_network
+
+
+  postgres:
+    image: postgres:16.1-alpine
+    restart: always
+    expose:
+      - 5432
+    ports:
+      - 5432:5432
+    environment:
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres:/var/lib/postgresql/data/pgdata
+      - $PWD/sql:/docker-entrypoint-initdb.d
+    networks:
+      - goyav_network
+
+    
+volumes:
+  clamdb:
+  postgres:
+
+networks:
+  goyav_network:

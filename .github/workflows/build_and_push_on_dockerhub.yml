@@ -1,0 +1,28 @@
+name: Build and Push Docker Image
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    env:
+        IMAGE: goyav:${GITHUB_REF_NAME}
+        DOCKER_HUB_PROFILE: farminyrd
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Build Docker image
+      run: docker build -f ./resources/docker/Dockerfile -t ${{env.DOCKER_HUB_PROFILE}}/${{ env.IMAGE }} ./src
+      
+    - name: Login to Docker registry
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
+        
+    - name: Push Docker image
+      run: docker push ${{env.DOCKER_HUB_PROFILE}}/${{ env.IMAGE }}
