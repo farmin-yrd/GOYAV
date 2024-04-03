@@ -98,6 +98,8 @@ GOYAV can be containerized using Docker. To create a Docker image:
 
 ## Configuring the environment
 
+The current implementation of GOYAV relies on a Postgresql database (version 12 or later) for storing the results of antivirus analyses. It employs an S3 bucket, such as Minio, for the temporary storage of files awaiting analysis. After the antivirus analysis is completed, the files are automatically deleted from the S3 bucket. The antivirus analysis itself is conducted using ClamAV (version 1.2 or later).
+
 Set up and customize GOYAV through environment variables for maximum flexibility.
 
 Start by accessing the environment variable template file at  [template.env](./resources/docker/template.env).
