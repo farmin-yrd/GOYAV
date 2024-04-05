@@ -104,48 +104,43 @@ func setup(host *string, port *int64, maxUploadSize *uint64, uploadTimeout *uint
 	return nil
 }
 
-// setupMinioByteRepository configures a Minio binary repository for storing binary data of files.
+// setupMinioByteRepository configures a s3 binary repository for storing binary data of files.
 func setupMinioByteRepository(b *port.BinaryRepository) error {
 	var err error
 
-	// Retrieve Minio host configuration
-	host := helper.GetEnvWithDefault("GOYAV_S3_HOST", "127.0.0.1")
-	slog.Info("configuring s3 bucket", "host", host)
-
-	// Parse and validate Minio port
-	prt, err := strconv.ParseUint(helper.GetEnvWithDefault("GOYAV_S3_PORT", "9000"), 10, 64)
+	// Retrieve the s3 endpoint endpoint : host and port without protocol
+	endpoint, err := helper.GetEnvWithError("GOYAV_S3_ENDPOINT_URL")
 	if err != nil {
-		return errors.New("GOYAV_S3_PORT must be a valid port number")
+		return err
 	}
-	slog.Info("configuring s3 bucket", "port", prt)
+	slog.Info("configuring s3 bucket", "endpoint URL", endpoint)
 
-	// Retrieve Minio access key ID with error check
+	// Retrieve s3 access key ID with error check
 	accessKeyID, err := helper.GetEnvWithError("GOYAV_S3_ACCESS_KEY")
 	if err != nil {
 		return err
 	}
 	slog.Info("configuring s3 bucket", "access key ID", accessKeyID)
 
-	// Retrieve Minio secret key with error check
+	// Retrieve s3 secret key with error check
 	secretKey, err := helper.GetEnvWithError("GOYAV_S3_SECRET_KEY")
 	if err != nil {
 		return err
 	}
 	slog.Debug("configuring s3 bucket", "secret key", secretKey)
 
-	// Retrieve Minio bucket name configuration
+	// Retrieve s3 bucket name configuration
 	bucketName := helper.GetEnvWithDefault("GOYAV_S3_BUCKET_NAME", "goyav")
 	slog.Info("configuring s3 bucket", "bucket name", bucketName)
 
-	// Parse and validate Minio SSL usage
+	// Parse and validate s3 SSL usage
 	useSSL, err := strconv.ParseBool(helper.GetEnvWithDefault("GOYAV_S3_USE_SSL", "false"))
 	if err != nil {
 		return errors.New("GOYAV_S3_USE_SSL must be true or false")
 	}
 	slog.Info("configuring s3 bucket", "use ssl ?", useSSL)
 
-	// Create Minio client
-	endpoint := fmt.Sprintf("%v:%v", host, prt)
+	// Create s3 client
 	cli, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKeyID, secretKey, ""),
 		Secure: useSSL,

@@ -128,8 +128,9 @@ with expired TTL. Negative or zero values are interpreted as disabling this purg
 
 #### S3 object storage configuration
 
-- `GOYAV_S3_HOST` (optional): Host address for S3 object storage. Default is `localhost`.
-- `GOYAV_S3_PORT` (optional): Port for S3 object storage. Default is `9000`.
+
+- `GOYAV_S3_ENDPOINT_URL`: Endpoint URL for an S3 server. Use the format `host:port`, where `host` is the domain or IP of the server, and `port` is the listening port. Exclude HTTP/HTTPS prefixes.
+  - Examples: `s3-server.example.com:9000`, `192.168.1.5:9000`.
 - `GOYAV_S3_ACCESS_KEY`: Access key for S3 storage.
 - `GOYAV_S3_SECRET_KEY`: Secret key for S3 storage.
 - `GOYAV_S3_BUCKET_NAME`: S3 bucket name.
