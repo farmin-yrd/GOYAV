@@ -42,8 +42,8 @@ func NewMinio(client *minio.Client, bucketName string) (*MinioBinaryRepository, 
 		if err = client.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{}); err != nil {
 			return nil, fmt.Errorf("%w: %v", ErrMinioBinaryRepository, err)
 		}
+		slog.Debug("a new bucket is created")
 	}
-	slog.Debug("new bucket created")
 
 	return &MinioBinaryRepository{
 		client:     client,
