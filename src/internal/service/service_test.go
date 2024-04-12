@@ -9,7 +9,6 @@ import (
 	"goyav/internal/core/domain"
 	"goyav/internal/core/port"
 	"goyav/pkg/helper"
-	"io"
 	"testing"
 	"time"
 
@@ -268,13 +267,12 @@ func TestUploadSuccessful(t *testing.T) {
 		with sql: SELECT * FROM DOCUMENTS
 		@%$<>*#`
 	expectedStatus := domain.StatusInfected
-	expectedID, err := helper.MakeID(io.NewSectionReader(mockData, 0, size), size, helper.Sanitize(providedTag))
+
+	cw := helper.NewCryptoWriter()
+
+	expectedHash, expectedID, err := cw.GenerateHashAndID(helper.Sanitize(providedTag))
 	if err != nil {
 		t.Fatalf("expected error: %v", err)
-	}
-	expectedHash, err := helper.MakeHash(io.NewSectionReader(mockData, 0, size), size)
-	if err != nil {
-		t.Fatalf("expected no error: %v", err)
 	}
 
 	ID, err := svc.Upload(ctx, mockData, size, providedTag)
@@ -297,7 +295,7 @@ func TestUploadSuccessful(t *testing.T) {
 		assert.NotContains(t, tag, c, "the tag sould not contain special caracters")
 	}
 
-	assert.Contains(t, tag, "àéèêëïôù", "The tag may contain accented characters.")
+	assert.Contains(t, tag, "àéèêëïôù", "The tag may contain accented characters after sanitizing.")
 
 	createAt := doc.CreatedAt
 	assert.NotEmpty(t, createAt, "the creation time of the document should not be empty")
@@ -317,6 +315,7 @@ func TestUploadSuccessful(t *testing.T) {
 }
 
 // Test case for re-uploading an existing document with an empty tag
+// in this cas no new document will be created: we return the ID of the existing document
 func TestUploadDocumentWithEmptyTag(t *testing.T) {
 	var (
 		binRepoMock   = binaryrepo.NewMock() // binary repository
@@ -341,6 +340,7 @@ func TestUploadDocumentWithEmptyTag(t *testing.T) {
 	assert.NotEmpty(t, ID, "an ID is expected after a successful upload")
 }
 
+// Test case for re-uploading an existing document the same tags
 func TestReUploadExistingDocumentWithSameTag(t *testing.T) {
 	var (
 		binRepoMock   = binaryrepo.NewMock() // binary repository
@@ -368,7 +368,9 @@ func TestReUploadExistingDocumentWithSameTag(t *testing.T) {
 	assert.Equal(t, ID, newID, "the ID for the re-uploaded document should match the original upload ID")
 }
 
-// Test case for re-uploading an existing document with different tags, expecting a pending status
+// Test case for re-uploading an existing document with different tags, when the existing document's status is pending
+// in this case a new document should be created with a new ID and a different creation datetime. The Hash and Analysis status of both documents should
+// sould be identical.
 func TestReUploadExistingDocumentStatusPendingWithNewTag(t *testing.T) {
 	var (
 		binRepoMock   = binaryrepo.NewMock() // binary repository
@@ -376,7 +378,7 @@ func TestReUploadExistingDocumentStatusPendingWithNewTag(t *testing.T) {
 		antivirusMock = antivirus.NewMock()  // antivirus analyzer
 
 		ctx      = context.Background()
-		mockData = bytes.NewReader(port.EICAR)
+		mockData = port.EICAR
 		size     = int64(len(port.EICAR))
 	)
 
@@ -385,41 +387,41 @@ func TestReUploadExistingDocumentStatusPendingWithNewTag(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	ID, err := svc.Upload(ctx, mockData, size, "EICAR")
+	ID, err := svc.Upload(ctx, bytes.NewReader(mockData), size, "EICAR")
 	assert.NoError(t, err, "no error expected for a successful upload")
 	assert.NotEmpty(t, ID, "an ID is expected after a successful upload")
 
 	// Re-upload the same document with a different tag, expecting a different ID
-	newID, err := svc.Upload(ctx, mockData, size, "eicar")
+	newID, err := svc.Upload(ctx, bytes.NewReader(mockData), size, "eicar")
 	assert.NoError(t, err, "no error expected for uploading an existing document")
 	assert.NotEqual(t, ID, newID, "a different ID is expected when the tag is changed")
 
-	doc, err := svc.DocumentRepository.Get(ctx, ID)
+	existingDoc, err := svc.DocumentRepository.Get(ctx, ID)
 	if err != nil {
 		t.Fatalf("unexpected error occurred when retrieving the document: %v", err)
 	}
 
-	assert.Equal(t, doc.Status, domain.StatusPending, "the status of the original document should be 'pending'")
+	assert.Equal(t, existingDoc.Status, domain.StatusPending, "the status of the original document should be 'pending'")
 	newDoc, err := svc.DocumentRepository.Get(ctx, newID)
 	if err != nil {
 		t.Fatalf("unexpected error occurred when retrieving the document: %v", err)
 	}
 
-	assert.Equal(t, newDoc.Status, domain.StatusPending, "the status of the re-uploaded document should also be 'pending'")
-
-	assert.NotEqual(t, doc.CreatedAt, newDoc.CreatedAt, "expected diffrent creation dates")
+	assert.NotEqual(t, newDoc.ID, existingDoc.ID, "the ID of the re-uploaded document should be different from the existing document")
+	assert.NotEqual(t, existingDoc.CreatedAt, newDoc.CreatedAt, "expected diffrent creation dates")
 
 	// wait for antivirus anlysis to finish
 	time.Sleep(time.Millisecond * 1500)
 
-	assert.NotEqual(t, newDoc.Status, domain.StatusPending, "the status of the re-uploaded document should not be 'pending'")
+	assert.NotEqual(t, existingDoc.Status, domain.StatusPending, "the status of the existing document should not be 'pending' after analysis")
+	assert.NotEqual(t, newDoc.Status, domain.StatusPending, "the status of the re-uploaded document should not be 'pending' after analysis")
 
-	assert.NotEqual(t, doc.CreatedAt, newDoc.CreatedAt, "the creation dates of the original and re-uploaded documents should be different")
-	assert.NotEqual(t, doc.AnalyzedAt, newDoc.AnalyzedAt, "the analysis dates of the original and re-uploaded documents should be different")
-	assert.Equal(t, doc.Status, newDoc.Status, "the analysis status of both documents should be the same")
+	assert.Equal(t, existingDoc.Hash, newDoc.Hash, "expected the same analysis hash")
+	assert.Equal(t, existingDoc.Status, newDoc.Status, "the analysis status of both documents should be the same")
 }
 
-// Test case for re-uploading an existing document with different tags when status is not pending
+// Test case for re-uploading an existing document with different tags when the existing document status is not pending
+// in this case a new document with a new ID should be created. The hash, analysis status, and analysis data time sould be the same for both documents.
 func TestReUploadExistingDocumentStatusNotPendingWithNewTag(t *testing.T) {
 	var (
 		binRepoMock   = binaryrepo.NewMock() // binary repository
@@ -427,7 +429,7 @@ func TestReUploadExistingDocumentStatusNotPendingWithNewTag(t *testing.T) {
 		antivirusMock = antivirus.NewMock()  // antivirus analyzer
 
 		ctx      = context.Background()
-		mockData = bytes.NewReader(port.EICAR)
+		mockData = port.EICAR
 		size     = int64(len(port.EICAR))
 	)
 
@@ -436,7 +438,7 @@ func TestReUploadExistingDocumentStatusNotPendingWithNewTag(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	ID, err := svc.Upload(ctx, mockData, size, "EICAR")
+	ID, err := svc.Upload(ctx, bytes.NewReader(mockData), size, "EICAR")
 	assert.NoError(t, err, "no error is expected for the initial successful upload")
 	assert.NotEmpty(t, ID, "an ID is expected after the initial successful upload")
 
@@ -444,7 +446,7 @@ func TestReUploadExistingDocumentStatusNotPendingWithNewTag(t *testing.T) {
 	time.Sleep(time.Millisecond * 1500)
 
 	// reupload the same document with a different tag
-	newID, err := svc.Upload(ctx, mockData, size, "eicar")
+	newID, err := svc.Upload(ctx, bytes.NewReader(mockData), size, "eicar")
 	assert.ErrorIs(t, err, port.ErrDocumentAlreadyExists, "ErrDocumentAlreadyExists expected for uploading an existing document")
 	assert.NotEqual(t, ID, newID, "expected diffrent ID, got the same: %q", ID)
 
@@ -462,6 +464,7 @@ func TestReUploadExistingDocumentStatusNotPendingWithNewTag(t *testing.T) {
 	assert.NotEqual(t, newDoc.Status, domain.StatusPending, "the status of the re-uploaded document should be 'pending'")
 
 	assert.NotEqual(t, doc.CreatedAt, newDoc.CreatedAt, "the creation dates of the original and re-uploaded documents should be different")
+	assert.Equal(t, doc.Hash, newDoc.Hash, "expected the same analysis hash")
 	assert.Equal(t, doc.AnalyzedAt, newDoc.AnalyzedAt, "expected the same analysis date")
 	assert.Equal(t, doc.Status, newDoc.Status, "expected the same analysis status")
 }

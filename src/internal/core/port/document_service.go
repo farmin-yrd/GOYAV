@@ -12,7 +12,7 @@ import (
 type DocumentService interface {
 	// Upload accepts a byte slice representing a document, along with a tag for the document.
 	// It returns the ID of the newly uploaded document and any error encountered during the upload process.
-	Upload(ctx context.Context, data io.ReadSeeker, size int64, tag string) (ID string, err error)
+	Upload(ctx context.Context, data io.Reader, size int64, tag string) (ID string, err error)
 
 	// GetDocument retrieves the current status of a document identified by its ID.
 	// It returns the document information (if found) and any error encountered during the retrieval process.

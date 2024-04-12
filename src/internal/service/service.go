@@ -95,15 +95,19 @@ func (s *Service) Information() string {
 // Upload handles the uploading of a document to the service. It computes a hash of the document,
 // sanitizes the provided tag, checks for the existence of a document with the same hash,
 // and either returns the ID of the existing document or saves a new one and triggers antivirus analysis.
-func (s *Service) Upload(ctx context.Context, data io.ReadSeeker, size int64, tag string) (ID string, err error) {
-	// Calculate the hash of the document.
-	hash, err := helper.MakeHash(data, size)
-	if err != nil {
-		return "", fmt.Errorf("service: failed to calculate the hash: %w", err)
-	}
-
+func (s *Service) Upload(ctx context.Context, data io.Reader, size int64, tag string) (ID string, err error) {
 	// Sanitize the tag.
 	tag = helper.Sanitize(tag)
+
+	// new CryptoWriter for generating hash and ID
+	cw := helper.NewCryptoWriter()
+	data = io.TeeReader(io.LimitReader(data, size), cw)
+
+	// Calculate the hash of the document and Generate its ID
+	hash, ID, err := cw.GenerateHashAndID(tag)
+	if err != nil {
+		return "", fmt.Errorf("service: failed to calculate the hash or creating a document ID : %w", err)
+	}
 
 	// Check if a document with the same hash already exists.
 	existingDoc, _ := s.DocumentRepository.GetByHash(ctx, hash)
@@ -113,13 +117,7 @@ func (s *Service) Upload(ctx context.Context, data io.ReadSeeker, size int64, ta
 			return existingDoc.ID, port.ErrDocumentAlreadyExists
 		}
 
-		// Generate a new ID for different tag.
-		ID, err = helper.MakeID(data, size, tag)
-		if err != nil {
-			return "", fmt.Errorf("service: failed to create a document ID: %w", err)
-		}
-
-		// Save the document with a new ID if it's not pending analysis.
+		// Otherwise save the document with a new ID if it's not pending analysis.
 		if existingDoc.Status != domain.StatusPending {
 			err = s.DocumentRepository.Save(ctx, &domain.Document{
 				ID:         ID,
@@ -136,14 +134,8 @@ func (s *Service) Upload(ctx context.Context, data io.ReadSeeker, size int64, ta
 		}
 	}
 
-	// Generate a new ID for new document.
-	ID, err = helper.MakeID(data, size, tag)
-	if err != nil {
-		return "", fmt.Errorf("service: failed to create a document ID: %w", err)
-	}
-
 	// Save the binary data.
-	if err = s.BinayRepository.Save(ctx, io.LimitReader(data, size), size, ID); err != nil {
+	if err = s.BinayRepository.Save(ctx, data, size, ID); err != nil {
 		return "", fmt.Errorf("service: %w: %w: id=%v", port.ErrServiceUploadFailed, err, ID)
 	}
 
