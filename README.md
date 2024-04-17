@@ -111,14 +111,14 @@ Start by accessing the environment variable template file at  [template.env](./r
 - `GOYAV_HOST` (optional): Host address for the API server. Default is `localhost`.
 - `GOYAV_PORT` (optional): Port for the API server. Default is `80`.
 - `GOYAV_VERSION`: Version of GOYAV.
-- `GOYAV_INFORMATION`: Additional information about GOYAV.
+- `GOYAV_INFORMATION` (optional): Additional information about GOYAV, such as the URL where the API specifications can be found. This information is displayed in the `PING` endpoint. Default is "GOYAV".
 
 #### File upload and analysis configuration
 
 - `GOYAV_MAX_UPLOAD_SIZE` (optional): Maximum size for file uploads, in bytes. Default is 1 MiB (1048576 bytes).
 - `GOYAV_UPLOAD_TIMEOUT` (optional): Time limit for file uploads, in seconds. Default is `10` seconds.
 - `GOYAV_RESULT_TTL` (optional): Duration to keep an analysis result in the system. Format: `[0-9]+(s|m|h)`, e.g., `2h50m10s`. A strictly positive value triggers periodic purging of the repository from documents
-with expired TTL. Negative or zero values are interpreted as disabling this purge, allowing documents to persist indefinitely.
+with expired TTL. Negative or zero values are interpreted as disabling this purge, allowing documents to persist indefinitely. Default is `1` hour.
 
 
 
