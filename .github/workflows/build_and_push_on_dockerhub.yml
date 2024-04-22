@@ -8,15 +8,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-        IMAGE: goyav:${GITHUB_REF_NAME}
-        DOCKER_HUB_PROFILE: farminyrd
+      BRANCH_TAG: goyav:${{ github.ref_name }}
+      LATEST_TAG: goyav:latest
+      DOCKER_HUB_PROFILE: farminyrd
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Build Docker image
-      run: docker build -f ./resources/docker/Dockerfile -t ${{env.DOCKER_HUB_PROFILE}}/${{ env.IMAGE }} ./src
+    - name: Build Docker image with branch tag
+      run: docker build -f ./resources/docker/Dockerfile -t ${{ env.DOCKER_HUB_PROFILE }}/${{ env.BRANCH_TAG }} ./src
+      
+    - name: Build Docker image with latest tag
+      run: docker tag ${{ env.DOCKER_HUB_PROFILE }}/${{ env.BRANCH_TAG }} ${{ env.DOCKER_HUB_PROFILE }}/${{ env.LATEST_TAG }}
       
     - name: Login to Docker registry
       uses: docker/login-action@v3
@@ -24,5 +28,8 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
         
-    - name: Push Docker image
-      run: docker push ${{env.DOCKER_HUB_PROFILE}}/${{ env.IMAGE }}
+    - name: Push Docker image with branch tag
+      run: docker push ${{ env.DOCKER_HUB_PROFILE }}/${{ env.BRANCH_TAG }}
+      
+    - name: Push Docker image with latest tag
+      run: docker push ${{ env.DOCKER_HUB_PROFILE }}/${{ env.LATEST_TAG }}
